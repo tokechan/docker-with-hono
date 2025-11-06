@@ -14,6 +14,8 @@ function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
 
   useEffect(() => {
     fetchTodos();
@@ -74,6 +76,14 @@ function App() {
     const todo = todos.find((t) => t.id === id);
     if (!todo) return;
 
+    // Optimistic Update: 即座にUIを更新
+    const previousTodos = todos;
+    const newCompleted = !todo.completed;
+    const updatedTodos = todos.map((t) => 
+      t.id === id ? { ...t, completed: newCompleted } : t
+    );
+    setTodos(updatedTodos);
+
     try {
       setError(null);
       const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
@@ -81,7 +91,7 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ completed: !todo.completed }),
+        body: JSON.stringify({ completed: newCompleted }),
       });
 
       if (!response.ok) {
@@ -89,10 +99,70 @@ function App() {
       }
 
       const data = await response.json();
-      setTodos(
-        todos.map((t) => (t.id === id ? data.todo : t))
+      // サーバーからのレスポンスで状態を更新
+      setTodos((currentTodos) =>
+        currentTodos.map((t) => (t.id === id ? data.todo : t))
       );
     } catch (err) {
+      // エラー時は元の状態に戻す
+      setTodos(previousTodos);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update todo';
+      setError(errorMessage);
+      console.error('Failed to update todo:', err);
+    }
+  };
+
+  const handleStartEdit = (id: number, currentTitle: string) => {
+    setEditingId(id);
+    setEditingTitle(currentTitle);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingTitle("");
+  };
+
+  const handleSaveEdit = async (id: number) => {
+    if (!editingTitle.trim()) {
+      setError("Todoのタイトルを入力してください");
+      return;
+    }
+
+    const todo = todos.find((t) => t.id === id);
+    if (!todo) return;
+
+    // Optimistic Update: 即座にUIを更新
+    const previousTodos = todos;
+    const updatedTodos = todos.map((t) => 
+      t.id === id ? { ...t, title: editingTitle.trim() } : t
+    );
+    setTodos(updatedTodos);
+    setEditingId(null);
+
+    try {
+      setError(null);
+      const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ title: editingTitle.trim() }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update todo: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      // サーバーからのレスポンスで状態を更新
+      setTodos((currentTodos) =>
+        currentTodos.map((t) => (t.id === id ? data.todo : t))
+      );
+      setEditingTitle("");
+    } catch (err) {
+      // エラー時は元の状態に戻す
+      setTodos(previousTodos);
+      setEditingId(id);
       const errorMessage = err instanceof Error ? err.message : 'Failed to update todo';
       setError(errorMessage);
       console.error('Failed to update todo:', err);
@@ -158,17 +228,58 @@ function App() {
                       type='checkbox'
                       checked={todo.completed}
                       onChange={() => handleToggleTodo(todo.id)}
-                      className='w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2'
+                      disabled={editingId === todo.id}
+                      className='w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50'
                     />
-                    <span 
-                    className={`flex-1 ${
-                      todo.completed
-                        ? 'line-through text-gray-500' 
-                        : 'text-gray-800'} text-sm font-medium
-                      }`}
-                    >
-                      {todo.title}
-                    </span>
+                    {editingId === todo.id ? (
+                      <div className='flex-1 flex items-center gap-2'>
+                        <input
+                          type='text'
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveEdit(todo.id);
+                            } else if (e.key === 'Escape') {
+                              handleCancelEdit();
+                            }
+                          }}
+                          autoFocus
+                          className='flex-1 px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm'
+                        />
+                        <button
+                          onClick={() => handleSaveEdit(todo.id)}
+                          className='px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm'
+                        >
+                          保存
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className='px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm'
+                        >
+                          キャンセル
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span 
+                          className={`flex-1 ${
+                            todo.completed
+                              ? 'line-through text-gray-500' 
+                              : 'text-gray-800'} text-sm font-medium
+                            }`}
+                        >
+                          {todo.title}
+                        </span>
+                        <button
+                          onClick={() => handleStartEdit(todo.id, todo.title)}
+                          disabled={todo.completed}
+                          className='px-3 py-1 text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed'
+                        >
+                          編集
+                        </button>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>

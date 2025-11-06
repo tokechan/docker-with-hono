@@ -42,12 +42,20 @@ app.post('/todos', async (c) => {
 
 app.put('/todos/:id', async (c) => {
   const { id } = c.req.param();
-  const { completed } = await c.req.json();
+  const body = await c.req.json();
   const todo = todos.find((todo) => todo.id === Number(id));
   if (!todo) {
     return c.notFound();
   }
-  todo.completed = completed;
+  
+  // title または completed を更新可能にする
+  if (body.title !== undefined) {
+    todo.title = body.title;
+  }
+  if (body.completed !== undefined) {
+    todo.completed = body.completed;
+  }
+  
   return c.json({ todo }, 200);
 });
 
