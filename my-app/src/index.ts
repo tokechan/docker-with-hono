@@ -30,6 +30,17 @@ app.post('/todos', async (c) => {
   return c.json({ todo }, 201);
 });
 
+app.put('/todos/:id', async (c) => {
+  const { id } = c.req.param();
+  const { completed } = await c.req.json();
+  const todo = todos.find((todo) => todo.id === Number(id));
+  if (!todo) {
+    return c.notFound();
+  }
+  todo.completed = completed;
+  return c.json({ todo }, 200);
+});
+
 
 serve({
   fetch: app.fetch,
