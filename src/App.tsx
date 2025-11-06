@@ -1,40 +1,102 @@
 import './App.css';
-import { useEffect,useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Todo {
   id: number;
   title: string;
   completed: boolean;
-};
+}
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 function App() {
   const [title, setTitle] = useState("");
   const [todos, setTodos] = useState<Todo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTodos();
   }, []);
 
   const fetchTodos = async () => {
-    const response = await fetch("http://localhost:3000/todos");
-    const data = await response.json();
-    setTodos(data.todos);
-  };
-
-  const handleAddTodo = () => {
-    if (title.trim()) {
-      setTodos([...todos, { id: todos.length + 1, title: title, completed: false }]);
-      setTitle("");
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`${API_BASE_URL}/todos`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch todos: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      setTodos(data.todos);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch todos';
+      setError(errorMessage);
+      console.error('Failed to fetch todos:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleToggleTodo = (id: number) => {
-    setTodos(
-      todos.map((todo) => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-      )
-    );
+  const handleAddTodo = async () => {
+    if (!title.trim()) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`${API_BASE_URL}/todos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ title }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add todo: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setTodos([...todos, data.todo]);
+      setTitle("");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add todo';
+      setError(errorMessage);
+      console.error('Failed to add todo:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleTodo = async (id: number) => {
+    const todo = todos.find((t) => t.id === id);
+    if (!todo) return;
+
+    try {
+      setError(null);
+      const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ completed: !todo.completed }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update todo: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setTodos(
+        todos.map((t) => (t.id === id ? data.todo : t))
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update todo';
+      setError(errorMessage);
+      console.error('Failed to update todo:', err);
+    }
   };
 
   
@@ -46,6 +108,12 @@ function App() {
           <h1 className='text-3xl font-bold text center text-gray-800 mb-6'>
             Todo List App
           </h1>
+
+          {error && (
+            <div className='mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg'>
+              <p className='text-sm'>{error}</p>
+            </div>
+          )}
           
           <div className='flex gap-2 mb-6'>
             <input 
@@ -59,13 +127,18 @@ function App() {
             />
             <button
                 onClick={handleAddTodo}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={loading}
+                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                Add Task
+                {loading ? 'Adding...' : 'Add Task'}
             </button>
           </div>
 
-            {todos.length === 0 ? (
+            {loading && todos.length === 0 ? (
+              <div className='text-center text-gray-500 py-8'>
+                <p className='text-lg'>Loading...</p>
+              </div>
+            ) : todos.length === 0 ? (
               <div className='text-center text-gray-500 py-8'>
                 <p className='text-lg'>No tasks yet.</p>
                 <p className='text-sm'>Add a new task to get started.</p>
