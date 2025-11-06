@@ -43,10 +43,14 @@ app.post('/todos', async (c) => {
 app.put('/todos/:id', async (c) => {
   const { id } = c.req.param();
   const body = await c.req.json();
+  console.log('PUT /todos/:id - Request:', { id, body });
   const todo = todos.find((todo) => todo.id === Number(id));
   if (!todo) {
+    console.log('Todo not found:', id);
     return c.notFound();
   }
+  
+  console.log('Before update:', { id: todo.id, title: todo.title, completed: todo.completed });
   
   // title または completed を更新可能にする
   if (body.title !== undefined) {
@@ -55,6 +59,8 @@ app.put('/todos/:id', async (c) => {
   if (body.completed !== undefined) {
     todo.completed = body.completed;
   }
+  
+  console.log('After update:', { id: todo.id, title: todo.title, completed: todo.completed });
   
   return c.json({ todo }, 200);
 });

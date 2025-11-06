@@ -131,22 +131,26 @@ function App() {
     const todo = todos.find((t) => t.id === id);
     if (!todo) return;
 
+    const newTitle = editingTitle.trim();
+    
     // Optimistic Update: 即座にUIを更新
     const previousTodos = todos;
     const updatedTodos = todos.map((t) => 
-      t.id === id ? { ...t, title: editingTitle.trim() } : t
+      t.id === id ? { ...t, title: newTitle } : t
     );
     setTodos(updatedTodos);
     setEditingId(null);
+    setEditingTitle("");
 
     try {
       setError(null);
+      console.log('Updating todo:', { id, title: newTitle });
       const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ title: editingTitle.trim() }),
+        body: JSON.stringify({ title: newTitle }),
       });
 
       if (!response.ok) {
@@ -154,15 +158,21 @@ function App() {
       }
 
       const data = await response.json();
-      // サーバーからのレスポンスで状態を更新
-      setTodos((currentTodos) =>
-        currentTodos.map((t) => (t.id === id ? data.todo : t))
-      );
-      setEditingTitle("");
+      console.log('Todo updated successfully:', data);
+      // サーバーからのレスポンスで状態を更新（サーバーの値が正しいことを確認）
+      if (data.todo && data.todo.title === newTitle) {
+        setTodos((currentTodos) =>
+          currentTodos.map((t) => (t.id === id ? data.todo : t))
+        );
+      } else {
+        // サーバーからのレスポンスが期待と異なる場合は、Optimistic Updateの内容を保持
+        console.warn('Server response does not match expected title. Keeping optimistic update.');
+      }
     } catch (err) {
       // エラー時は元の状態に戻す
       setTodos(previousTodos);
       setEditingId(id);
+      setEditingTitle(todo.title);
       const errorMessage = err instanceof Error ? err.message : 'Failed to update todo';
       setError(errorMessage);
       console.error('Failed to update todo:', err);
