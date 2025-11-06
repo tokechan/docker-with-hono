@@ -17,11 +17,28 @@ app.use(
   })
 );
 
-// データベース初期化
-initializeDatabase().catch((err) => {
-  console.error('Failed to initialize database:', err);
-  process.exit(1);
-});
+// データベース初期化（サーバー起動前に完了させる）
+async function startServer() {
+  try {
+    // データベースが準備できるまで少し待つ
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    await initializeDatabase();
+    console.log('Database initialized, starting server...');
+    
+    serve({
+      fetch: app.fetch,
+      port: 3000
+    }, async (info) => {
+      console.log(`Server is running on http://localhost:${info.port}`)
+    });
+  } catch (err) {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 app.get('/', (c) => {
   return c.text('Hello Hono!')
@@ -126,10 +143,3 @@ app.put('/todos/:id', async (c) => {
     return c.json({ error: 'Failed to update todo' }, 500);
   }
 });
-
-serve({
-  fetch: app.fetch,
-  port: 3000
-}, async (info) => {
-  console.log(`Server is running on http://localhost:${info.port}`)
-})

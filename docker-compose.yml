@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   client:
     build: .
@@ -17,7 +16,8 @@ services:
     ports: 
       - "3000:3000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/todos_db
     volumes:
