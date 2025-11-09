@@ -1,14 +1,8 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import pool, { initializeDatabase } from './db.js'
+import { initializeDatabase } from './db.js'
 import prisma from './lib/prisma.js'
-
-interface Todo {
-  id: number;
-  title: string;
-  completed: boolean;
-}
 
 const app = new Hono()
 
@@ -96,59 +90,51 @@ app.post('/todos', async (c) => {
 app.put('/todos/:id', async (c) => {
   try {
     const { id } = c.req.param();
-    const body = await c.req.json();
-    
-    console.log('PUT /todos/:id - Request:', { id, body });
-    
-    // 既存のTodoを取得
-    const existingResult = await pool.query('SELECT * FROM todos WHERE id = $1', [id]);
-    if (existingResult.rows.length === 0) {
-      console.log('Todo not found:', id);
+    const todoId = Number(id);
+
+    if (Number.isNaN(todoId)) {
+      return c.json({ error: 'Invalid todo id' }, 400);
+    }
+
+    const body = await c.req.json<{ title?: unknown; completed?: unknown }>();
+
+    const data: { title?: string; completed?: boolean } = {};
+
+    if (body.title !== undefined) {
+      if (typeof body.title !== 'string' || !body.title.trim()) {
+        return c.json({ error: 'Title must be a non-empty string' }, 400);
+      }
+      data.title = body.title;
+    }
+
+    if (body.completed !== undefined) {
+      if (typeof body.completed !== 'boolean') {
+        return c.json({ error: 'Completed must be a boolean' }, 400);
+      }
+      data.completed = body.completed;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return c.json({ error: 'No fields to update' }, 400);
+    }
+
+    const todo = await prisma.todo.update({
+      where: { id: todoId },
+      data,
+      select: { id: true, title: true, completed: true },
+    });
+
+    return c.json({ todo }, 200);
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: string }).code === 'P2025'
+    ) {
       return c.notFound();
     }
-    
-    const existingTodo = existingResult.rows[0];
-    console.log('Before update:', { id: existingTodo.id, title: existingTodo.title, completed: existingTodo.completed });
-    
-    // 更新するフィールドを構築
-    const updates: string[] = [];
-    const values: (string | boolean | number)[] = [];
-    let paramIndex = 1;
-    
-    if (body.title !== undefined) {
-      updates.push(`title = $${paramIndex}`);
-      values.push(body.title);
-      paramIndex++;
-    }
-    
-    if (body.completed !== undefined) {
-      updates.push(`completed = $${paramIndex}`);
-      values.push(body.completed);
-      paramIndex++;
-    }
-    
-    if (updates.length === 0) {
-      return c.json({ todo: existingTodo }, 200);
-    }
-    
-    // updated_atを更新
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    values.push(Number(id));
-    
-    const query = `UPDATE todos SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING id, title, completed`;
-    
-    const result = await pool.query(query, values);
-    const todo: Todo = {
-      id: result.rows[0].id,
-      title: result.rows[0].title,
-      completed: result.rows[0].completed,
-    };
-    
-    console.log('After update:', { id: todo.id, title: todo.title, completed: todo.completed });
-    
-    return c.json({ todo }, 200);
-  } catch (err) {
-    console.error('Error updating todo:', err);
+    console.error('Error updating todo:', error);
     return c.json({ error: 'Failed to update todo' }, 500);
   }
 });
