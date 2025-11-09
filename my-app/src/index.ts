@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import pool, { initializeDatabase } from './db.js'
+import prisma from './lib/prisma.js'
 
 interface Todo {
   id: number;
@@ -46,12 +47,16 @@ app.get('/', (c) => {
 
 app.get('/todos', async (c) => {
   try {
-    const result = await pool.query('SELECT id, title, completed FROM todos ORDER BY id ASC');
-    const todos: Todo[] = result.rows.map((row: { id: number; title: string; completed: boolean }) => ({
-      id: row.id,
-      title: row.title,
-      completed: row.completed,
-    }));
+    const todos = await prisma.todo.findMany({
+      select: {
+        id: true,
+        title: true,
+        completed: true,
+      },
+      orderBy: {
+        id: 'asc',
+      },
+    });
     return c.json({ todos }, 200);
   } catch (err) {
     console.error('Error fetching todos:', err);
@@ -66,16 +71,20 @@ app.post('/todos', async (c) => {
       return c.json({ error: 'Title is required' }, 400);
     }
 
-    const result = await pool.query(
-      'INSERT INTO todos (title, completed) VALUES ($1, $2) RETURNING id, title, completed',
-      [title, false]
-    );
-    
-    const todo: Todo = {
-      id: result.rows[0].id,
-      title: result.rows[0].title,
-      completed: result.rows[0].completed,
-    };
+    // const result = await pool.query(
+    //   'INSERT INTO todos (title, completed) VALUES ($1, $2) RETURNING id, title, completed',
+    //   [title, false]
+    // );
+    const todo =  await prisma.todo.create({
+      data: { title, completed: false },
+      select: { id: true, title: true, completed: true },
+    });
+
+    // const todo: Todo = {
+    //   id: result.rows[0].id,
+    //   title: result.rows[0].title,
+    //   completed: result.rows[0].completed,
+    // };
     
     return c.json({ todo }, 201);
   } catch (err) {
