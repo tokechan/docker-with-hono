@@ -2,9 +2,12 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-COPY . .
+# package.jsonとpackage-lock.jsonを先にコピーして依存関係をインストール
+COPY package*.json ./
+RUN npm install
 
-RUN npm  install
+# 残りのファイルをコピー
+COPY . .
 
 EXPOSE 3000
 

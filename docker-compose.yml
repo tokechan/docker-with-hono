@@ -1,4 +1,3 @@
-version: '3,8'
 services:
   client:
     build: .
@@ -7,10 +6,41 @@ services:
       - "5173:5173"
     depends_on:
       - api
+    volumes:
+      - .:/app
+      - /app/node_modules
   
   api:
     build: ./my-app
     container_name: api
     ports: 
       - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/todos_db
+    volumes:
+      - ./my-app:/app
+      - /app/node_modules
+
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=todos_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
 
