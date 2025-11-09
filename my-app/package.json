@@ -2,7 +2,8 @@
   "name": "my-app",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "prisma:generate": "prisma generate --schema=./prisma/schema.prisma",
+    "dev": "npm run prisma:generate && tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },

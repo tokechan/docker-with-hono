@@ -10,8 +10,8 @@ RUN npm install
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 
-# Prisma Clientを生成
-RUN npx prisma generate
+# Prisma Clientを生成（DATABASE_URLはダミー値でOK、実際にはDB接続しない）
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
 # アプリケーションのファイルをコピー
 COPY my-app/ ./
