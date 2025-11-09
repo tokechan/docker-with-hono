@@ -11,7 +11,9 @@ services:
       - /app/node_modules
   
   api:
-    build: ./my-app
+    build:
+      context: .
+      dockerfile: ./my-app/Dockerfile
     container_name: api
     ports: 
       - "3000:3000"

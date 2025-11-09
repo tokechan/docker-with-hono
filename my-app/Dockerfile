@@ -3,11 +3,18 @@ FROM node:18-alpine
 WORKDIR /app
 
 # package.jsonとpackage-lock.jsonを先にコピーして依存関係をインストール
-COPY package*.json ./
+COPY my-app/package*.json ./
 RUN npm install
 
-# 残りのファイルをコピー
-COPY . .
+# Prismaスキーマと設定ファイルをコピー
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+
+# Prisma Clientを生成
+RUN npx prisma generate
+
+# アプリケーションのファイルをコピー
+COPY my-app/ ./
 
 EXPOSE 3000
 
